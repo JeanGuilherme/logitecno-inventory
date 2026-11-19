@@ -10,39 +10,76 @@ import (
 const schemaVersion = "1.0.0"
 
 func main() {
+	clearScreen()
+	printBanner()
+
+	// 1. Coleta automatica
+	fmt.Println("\n  Coletando dados de hardware...")
 	inv := collectInventory()
 
-	// Detectar rede (não bloqueia se falhar)
-	netStatus := checkNetwork()
-	inv.Network = netStatus
+	// 2. Input manual (opcional, com timeout)
+	collectManualInput(&inv)
 
-	// Tentar enviar
-	if netStatus.Online {
+	// 3. Detectar rede
+	fmt.Println("\n  Verificando conexao...")
+	inv.Network = checkNetwork()
+
+	// 4. Tentar enviar
+	sent := false
+	queued := false
+
+	if inv.Network.Online {
+		fmt.Println("  Rede OK — enviando...")
 		if err := sendInventory(inv); err != nil {
-			fmt.Fprintf(os.Stderr, "envio falhou: %v\n", err)
+			fmt.Printf("  Envio falhou: %v\n", err)
 			inv.Errors = append(inv.Errors, "envio falhou: "+err.Error())
 			queueAppend(inv)
+			queued = true
+			beepQueued()
 		} else {
-			fmt.Println("enviado com sucesso")
+			sent = true
+			beepSuccess()
 		}
 	} else {
-		fmt.Println("offline — salvando na fila local")
+		fmt.Println("  Sem rede — salvando localmente...")
 		queueAppend(inv)
+		queued = true
+		beepQueued()
 	}
 
-	// Sempre imprime o JSON na tela (para o operador ver)
-	out, err := json.MarshalIndent(inv, "", "  ")
+	// 5. Resumo na tela
+	printSummary(&inv, sent, queued)
+
+	// 6. JSON completo (para debug / copia manual)
+	fmt.Println("  --- JSON ---")
+	out, err := json.MarshalIndent(inv, "  ", "  ")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "erro ao serializar:", err)
+		beepCritical()
 		os.Exit(1)
 	}
 	fmt.Println(string(out))
+	fmt.Println()
 
-	// Contagem regressiva para desligar
-	fmt.Println("\nDesligando em 10 segundos... (Ctrl+C para cancelar)")
-	for i := 10; i > 0; i-- {
-		fmt.Printf("%d... ", i)
+	// 7. Contagem regressiva
+	fmt.Println("  Desligando em 15 segundos... (Ctrl+C para cancelar)")
+	for i := 15; i > 0; i-- {
+		fmt.Printf("\r  %2d... ", i)
 		time.Sleep(time.Second)
 	}
+	fmt.Println("\n  Desligando.")
+}
+
+func clearScreen() {
+	fmt.Print("\033[H\033[2J")
+}
+
+func printBanner() {
+	fmt.Println()
+	fmt.Println("  ============================================================")
+	fmt.Println("                     LOGITECNO SOLUTIONS")
+	fmt.Println("                  Inventario de Hardware")
+	fmt.Println("  ============================================================")
+	fmt.Println("                        v" + schemaVersion)
 	fmt.Println()
 }
