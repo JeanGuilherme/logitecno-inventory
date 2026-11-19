@@ -82,7 +82,7 @@ build_rootfs() {
   debootstrap \
     --arch=amd64 \
     --variant=minbase \
-    --include=systemd-sysv,udev,iproute2,iputils-ping,ca-certificates,pciutils,util-linux,dmidecode,beep,kbd,console-setup \
+    --include=systemd-sysv,udev,iproute2,iputils-ping,ca-certificates,pciutils,util-linux,dmidecode,kbd,console-setup \
     "$UBUNTU_SUITE" "$ROOTFS" "$UBUNTU_MIRROR"
 
   ok "rootfs criado: $(du -sh "$ROOTFS" | cut -f1)"
@@ -104,8 +104,6 @@ install_agent() {
     echo "LOGITECNO_QUEUE_PATH=$QUEUE_PATH"
   } > "$ROOTFS/etc/environment"
 
-  # Modulo pcspkr para o beep funcionar em hardware antigo
-  echo "pcspkr" > "$ROOTFS/etc/modules-load.d/pcspkr.conf"
 
   ok "agente instalado"
 }
@@ -326,4 +324,4 @@ main() {
   summary
 }
 
-main "$@"
+main "$@"   
