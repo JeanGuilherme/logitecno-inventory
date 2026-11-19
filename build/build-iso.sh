@@ -74,6 +74,20 @@ preflight() {
   [[ -n "$ISOHDPFX" ]] || die "isohdpfx.bin nao encontrado. Instale: apt install isolinux syslinux-utils"
   ok "isohdpfx: $ISOHDPFX"
 }
+  # Monta /proc /sys /dev para o update-initramfs funcionar
+  mount -t proc  proc  "$ROOTFS/proc"
+  mount -t sysfs sysfs "$ROOTFS/sys"
+  mount --bind /dev   "$ROOTFS/dev"
+  mount --bind /dev/pts "$ROOTFS/dev/pts"
+
+  chroot "$ROOTFS" update-initramfs -c -k all || \
+    die "falha ao gerar initrd"
+
+  # Desmonta na ordem inversa
+  umount "$ROOTFS/dev/pts"
+  umount "$ROOTFS/dev"
+  umount "$ROOTFS/sys"
+  umount "$ROOTFS/proc"
 
 # ---------------------------------------------------------------- rootfs
 build_rootfs() {
@@ -86,9 +100,8 @@ build_rootfs() {
     --arch=amd64 \
     --variant=minbase \
     --components=main,universe \
-    --include=systemd-sysv,udev,iproute2,iputils-ping,ca-certificates,pciutils,util-linux,dmidecode,kbd,console-setup,linux-image-generic,initramfs-tools,beep \
-    "$UBUNTU_SUITE" "$ROOTFS" "$UBUNTU_MIRROR"
-
+    --include=systemd-sysv,udev,iproute2,iputils-ping,ca-certificates,pciutils,util-linux,dmidecode,kbd,console-setup,linux-image-generic,initramfs-tools,beep,casper,lupin-casper"$UBUNTU_SUITE" "$ROOTFS" "$UBUNTU_MIRROR" \
+    chroot "$ROOTFS" update-initramfs -u -k all
   # Garante que o initrd existe
   if ! ls "$ROOTFS"/boot/initrd.img-* >/dev/null 2>&1; then
     chroot "$ROOTFS" update-initramfs -c -k all || \
