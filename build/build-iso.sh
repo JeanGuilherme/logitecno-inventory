@@ -183,8 +183,7 @@ EOF
 configure_live() {
   log "5/9" "Configurando ambiente live (casper)"
 
-  # casper precisa saber onde esta o squashfs
-  mkdir -p "$ROOTFS/etc/casper.conf"
+  # casper.conf precisa ser ARQUIVO, nao diretorio
   cat > "$ROOTFS/etc/casper.conf" <<'EOF'
 export USERNAME="logitecno"
 export USERFULLNAME="LogiTecno Inventory"
