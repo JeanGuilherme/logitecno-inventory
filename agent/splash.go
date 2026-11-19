@@ -5,7 +5,6 @@ import (
 	"time"
 )
 
-// Cores ANSI
 const (
 	cReset  = "\033[0m"
 	cBold   = "\033[1m"
@@ -17,8 +16,10 @@ const (
 	cWhite  = "\033[97m"
 )
 
-// showSplash exibe a tela de abertura.
-// Duracao total: ~2 segundos (nao atrasa o operador).
+func clearScreen() {
+	fmt.Print("\033[H\033[2J")
+}
+
 func showSplash() {
 	clearScreen()
 
@@ -43,7 +44,6 @@ func showSplash() {
 	fmt.Println()
 	fmt.Println()
 
-	// Barra de progresso curta — da sensacao de "esta carregando"
 	fmt.Printf("%s          Carregando", cGray)
 	for i := 0; i < 3; i++ {
 		time.Sleep(400 * time.Millisecond)
@@ -54,7 +54,6 @@ func showSplash() {
 	time.Sleep(300 * time.Millisecond)
 }
 
-// printStatus imprime uma linha de status com cor.
 func printStatus(label string, ok bool, detail string) {
 	icon := cGreen + "[OK]" + cReset
 	if !ok {
@@ -67,16 +66,10 @@ func printStatus(label string, ok bool, detail string) {
 	}
 }
 
-// printWarn imprime um aviso em amarelo.
 func printWarn(msg string) {
 	fmt.Printf("  %s[AVISO]%s %s\n", cYellow, cReset, msg)
 }
 
-// printInfo imprime uma linha informativa.
 func printInfo(msg string) {
 	fmt.Printf("  %s%s%s\n", cGray, msg, cReset)
-}
-
-func clearScreen() {
-	fmt.Print("\033[H\033[2J")
 }

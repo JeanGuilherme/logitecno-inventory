@@ -45,7 +45,6 @@ func main() {
 	fmt.Printf("%s  ────────────────────────────────────────%s\n\n", cGray, cReset)
 
 	sent := false
-	queued := false
 
 	if inv.Network.Online {
 		fmt.Print("  Enviando... ")
@@ -53,8 +52,6 @@ func main() {
 			fmt.Printf("%sFALHOU%s\n", cRed, cReset)
 			printWarn(err.Error())
 			inv.Errors = append(inv.Errors, "envio falhou: "+err.Error())
-			queueAppend(inv)
-			queued = true
 			beepQueued()
 		} else {
 			fmt.Printf("%sENVIADO%s\n", cGreen, cReset)
@@ -62,32 +59,42 @@ func main() {
 			beepSuccess()
 		}
 	} else {
-		fmt.Print("  Salvando localmente... ")
-		queueAppend(inv)
-		queued = true
-		fmt.Printf("%sSALVO%s\n", cYellow, cReset)
-
-		if queueIsPersistent() {
-			printInfo("Arquivo: /mnt/dados/queue.jsonl (no pendrive)")
-		} else {
-			printWarn("Fila em /tmp — sera PERDIDA ao desligar!")
-			printWarn("Pendrive sem particao de dados. Veja build/prepare-usb.sh")
-		}
+		fmt.Printf("  %sSEM REDE%s\n", cYellow, cReset)
 		beepQueued()
 	}
 
-	// 5. Resumo
-	printSummary(&inv, sent, queued)
+	// 5. QR Code (se nao enviou)
+	if !sent {
+		fmt.Printf("\n%s%s  QR CODE%s\n", cWhite, cBold, cReset)
+		fmt.Printf("%s  ────────────────────────────────────────%s\n\n", cGray, cReset)
 
-	// 6. JSON
-	fmt.Printf("%s%s  JSON%s\n", cWhite, cBold, cReset)
+		if err := showQRCode(buildQRPayload(inv)); err != nil {
+			printWarn("QR Code nao gerado: " + err.Error())
+		}
+
+		fmt.Println()
+		printInfo("Escaneie para identificar a maquina")
+		printInfo("O JSON completo esta abaixo")
+	}
+
+	// 6. Resumo
+	printSummary(&inv, sent)
+
+	// 7. JSON completo
+	fmt.Printf("\n%s%s  JSON COMPLETO%s\n", cWhite, cBold, cReset)
 	fmt.Printf("%s  ────────────────────────────────────────%s\n", cGray, cReset)
+	fmt.Println()
 	out, _ := json.MarshalIndent(inv, "  ", "  ")
 	fmt.Println(string(out))
+	fmt.Println()
 
-	// 7. Desligar
-	fmt.Printf("\n%s  Desligando em 15 segundos... (Ctrl+C para cancelar)%s\n", cGray, cReset)
-	for i := 15; i > 0; i-- {
+	if !sent {
+		printWarn("Fotografe esta tela ou digite o JSON acima")
+	}
+
+	// 8. Desligar
+	fmt.Printf("\n%s  Desligando em 20 segundos... (Ctrl+C para cancelar)%s\n", cGray, cReset)
+	for i := 20; i > 0; i-- {
 		fmt.Printf("\r  %s%2d...%s ", cGray, i, cReset)
 		time.Sleep(time.Second)
 	}

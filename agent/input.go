@@ -84,7 +84,8 @@ func printHeader(title string) {
 }
 
 // printSummary mostra o resumo final na tela do operador.
-func printSummary(inv *Inventory, sent bool, queued bool) {
+// printSummary mostra o resumo final na tela do operador.
+func printSummary(inv *Inventory, sent bool) {
 	printHeader("RESUMO DA COLETA")
 
 	fmt.Printf("  Serial:       %s\n", orNA(inv.Serial))
@@ -113,14 +114,10 @@ func printSummary(inv *Inventory, sent bool, queued bool) {
 
 	fmt.Println()
 
-	// Status de envio
 	if sent {
 		fmt.Println("  [OK] ENVIADO COM SUCESSO")
-	} else if queued {
-		fmt.Println("  [!] SEM REDE — SALVO LOCALMENTE")
-		fmt.Println("      O dado sera enviado quando houver conexao.")
 	} else {
-		fmt.Println("  [X] ERRO NO ENVIO")
+		fmt.Println("  [!] SEM REDE — USE O QR CODE OU O JSON ACIMA")
 	}
 
 	if len(inv.Errors) > 0 {
