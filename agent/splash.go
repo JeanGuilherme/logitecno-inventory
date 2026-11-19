@@ -76,3 +76,7 @@ func printWarn(msg string) {
 func printInfo(msg string) {
 	fmt.Printf("  %s%s%s\n", cGray, msg, cReset)
 }
+
+func clearScreen() {
+	fmt.Print("\033[H\033[2J")
+}
