@@ -95,7 +95,7 @@ build_rootfs() {
     --arch=amd64 \
     --variant=minbase \
     --components=main,universe \
-    --include=systemd-sysv,udev,iproute2,iputils-ping,ca-certificates,pciutils,util-linux,dmidecode,kbd,console-setup,linux-image-generic,initramfs-tools,beep,casper,lupin-casper \
+    --include=systemd-sysv,udev,iproute2,iputils-ping,ca-certificates,pciutils,util-linux,dmidecode,kbd,console-setup,linux-image-generic,initramfs-tools,beep,casper \
     "$UBUNTU_SUITE" "$ROOTFS" "$UBUNTU_MIRROR"
 
   # Monta /proc /sys /dev para o update-initramfs gerar initrd COMPLETO.
