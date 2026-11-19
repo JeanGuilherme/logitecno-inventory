@@ -43,6 +43,13 @@ require_cmd() {
   command -v "$1" >/dev/null 2>&1 || die "comando '$1' nao encontrado. Instale: $2"
 }
 
+# Garante desmontagem dos binds mesmo se o script falhar no meio
+cleanup_mounts() {
+  for m in "$ROOTFS/dev/pts" "$ROOTFS/dev" "$ROOTFS/sys" "$ROOTFS/proc"; do
+    mountpoint -q "$m" 2>/dev/null && umount -l "$m" 2>/dev/null || true
+  done
+}
+
 # ---------------------------------------------------------------- preflight
 preflight() {
   log "1/9" "Verificando pre-requisitos"
@@ -74,20 +81,6 @@ preflight() {
   [[ -n "$ISOHDPFX" ]] || die "isohdpfx.bin nao encontrado. Instale: apt install isolinux syslinux-utils"
   ok "isohdpfx: $ISOHDPFX"
 }
-  # Monta /proc /sys /dev para o update-initramfs funcionar
-  mount -t proc  proc  "$ROOTFS/proc"
-  mount -t sysfs sysfs "$ROOTFS/sys"
-  mount --bind /dev   "$ROOTFS/dev"
-  mount --bind /dev/pts "$ROOTFS/dev/pts"
-
-  chroot "$ROOTFS" update-initramfs -c -k all || \
-    die "falha ao gerar initrd"
-
-  # Desmonta na ordem inversa
-  umount "$ROOTFS/dev/pts"
-  umount "$ROOTFS/dev"
-  umount "$ROOTFS/sys"
-  umount "$ROOTFS/proc"
 
 # ---------------------------------------------------------------- rootfs
 build_rootfs() {
@@ -96,17 +89,29 @@ build_rootfs() {
   rm -rf "$WORK"
   mkdir -p "$ROOTFS" "$ISO_DIR" "$OUTPUT_DIR"
 
+  # casper + lupin-casper sao OBRIGATORIOS para live boot.
+  # beep vem do universe, por isso --components=main,universe.
   debootstrap \
     --arch=amd64 \
     --variant=minbase \
     --components=main,universe \
-    --include=systemd-sysv,udev,iproute2,iputils-ping,ca-certificates,pciutils,util-linux,dmidecode,kbd,console-setup,linux-image-generic,initramfs-tools,beep,casper,lupin-casper"$UBUNTU_SUITE" "$ROOTFS" "$UBUNTU_MIRROR" \
-    chroot "$ROOTFS" update-initramfs -u -k all
-  # Garante que o initrd existe
-  if ! ls "$ROOTFS"/boot/initrd.img-* >/dev/null 2>&1; then
-    chroot "$ROOTFS" update-initramfs -c -k all || \
-      die "falha ao gerar initrd"
-  fi
+    --include=systemd-sysv,udev,iproute2,iputils-ping,ca-certificates,pciutils,util-linux,dmidecode,kbd,console-setup,linux-image-generic,initramfs-tools,beep,casper,lupin-casper \
+    "$UBUNTU_SUITE" "$ROOTFS" "$UBUNTU_MIRROR"
+
+  # Monta /proc /sys /dev para o update-initramfs gerar initrd COMPLETO.
+  # Sem isso o initrd sai minimo e o kernel sobe com tela preta.
+  mount -t proc  proc   "$ROOTFS/proc"
+  mount -t sysfs sysfs  "$ROOTFS/sys"
+  mount --bind /dev     "$ROOTFS/dev"
+  mount --bind /dev/pts "$ROOTFS/dev/pts"
+
+  # Regenera SEMPRE (nao so se faltar) para incluir os hooks do casper
+  chroot "$ROOTFS" update-initramfs -c -k all || {
+    cleanup_mounts
+    die "falha ao gerar initrd"
+  }
+
+  cleanup_mounts
 
   ok "rootfs criado: $(du -sh "$ROOTFS" | cut -f1)"
 }
@@ -231,7 +236,7 @@ copy_kernel() {
   cp "$initrd"  "$ISO_DIR/casper/initrd"
 
   ok "kernel: $(basename "$vmlinuz")"
-  ok "initrd: $(basename "$initrd")"
+  ok "initrd: $(basename "$initrd") ($(du -h "$initrd" | cut -f1))"
 }
 
 # ---------------------------------------------------------------- grub
@@ -240,9 +245,9 @@ build_grub() {
 
   mkdir -p "$ISO_DIR/boot/grub"
 
-  # Menu do GRUB — sem quiet/splash para o operador ver o que acontece
+  # Menu do GRUB — SEM quiet/splash para o operador ver onde trava
   cat > "$ISO_DIR/boot/grub/grub.cfg" <<'EOF'
-set timeout=3
+set timeout=5
 set default=0
 
 insmod all_video
@@ -255,7 +260,7 @@ menuentry "LogiTecno Inventory" {
 }
 
 menuentry "LogiTecno Inventory (diagnostico)" {
-    linux /casper/vmlinuz boot=casper verbose console=tty1 ---
+    linux /casper/vmlinuz boot=casper console=tty1 loglevel=7 debug ---
     initrd /casper/initrd
 }
 EOF
@@ -316,7 +321,7 @@ summary() {
   Tamanho:  $(du -h "$OUTPUT" | cut -f1)
 
   Testar em QEMU (sem pendrive):
-    sudo qemu-system-x86_64 -m 2048 -enable-kvm -cdrom "$OUTPUT"
+    sudo qemu-system-x86_64 -m 2048 -cdrom "$OUTPUT"
 
   Gravar no pendrive (SEM particao de dados):
     sudo umount /dev/sdX?* 2>/dev/null
