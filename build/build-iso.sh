@@ -24,7 +24,10 @@ UBUNTU_MIRROR="http://br.archive.ubuntu.com/ubuntu"
 
 AGENT_BIN="$PROJECT_ROOT/agent/collect"
 WEBHOOK_URL="${LOGITECNO_WEBHOOK_URL:-}"
-QUEUE_PATH="/var/lib/logitecno/queue.jsonl"
+
+# Fila volatil — sem particao de dados no pendrive.
+# O agente grava em /tmp e o QR Code + JSON na tela sao a saida real.
+QUEUE_PATH="/tmp/logitecno/queue.jsonl"
 
 # ---------------------------------------------------------------- helpers
 log()  { printf '\n\033[1;36m[%s]\033[0m %s\n' "$1" "$2"; }
@@ -56,7 +59,7 @@ preflight() {
   ok "agente encontrado: $AGENT_BIN"
 
   if [[ -z "$WEBHOOK_URL" ]]; then
-    warn "LOGITECNO_WEBHOOK_URL nao definida — a ISO vai rodar em modo offline"
+    warn "LOGITECNO_WEBHOOK_URL nao definida — a ISO vai rodar em modo offline (QR Code)"
   else
     ok "webhook configurado"
   fi
@@ -82,14 +85,15 @@ build_rootfs() {
   debootstrap \
     --arch=amd64 \
     --variant=minbase \
-    --include=systemd-sysv,udev,iproute2,iputils-ping,ca-certificates,pciutils,util-linux,dmidecode,kbd,console-setup,linux-image-generic,initramfs-tools \
+    --components=main,universe \
+    --include=systemd-sysv,udev,iproute2,iputils-ping,ca-certificates,pciutils,util-linux,dmidecode,kbd,console-setup,linux-image-generic,initramfs-tools,beep \
     "$UBUNTU_SUITE" "$ROOTFS" "$UBUNTU_MIRROR"
- 
-    # Garante que o initrd existe
-    if ! ls "$ROOTFS"/boot/initrd.img-* >/dev/null 2>&1; then
-        chroot "$ROOTFS" update-initramfs -c -k all || \
-        die "falha ao gerar initrd"
-    fi
+
+  # Garante que o initrd existe
+  if ! ls "$ROOTFS"/boot/initrd.img-* >/dev/null 2>&1; then
+    chroot "$ROOTFS" update-initramfs -c -k all || \
+      die "falha ao gerar initrd"
+  fi
 
   ok "rootfs criado: $(du -sh "$ROOTFS" | cut -f1)"
 }
@@ -100,7 +104,7 @@ install_agent() {
 
   install -Dm755 "$AGENT_BIN" "$ROOTFS/usr/local/bin/logitecno-collect"
 
-  # Diretorio da fila local
+  # Diretorio da fila volatil
   mkdir -p "$ROOTFS$(dirname "$QUEUE_PATH")"
 
   # Variaveis de ambiente do agente
@@ -110,7 +114,6 @@ install_agent() {
     echo "LOGITECNO_QUEUE_PATH=$QUEUE_PATH"
   } > "$ROOTFS/etc/environment"
 
-
   ok "agente instalado"
 }
 
@@ -118,27 +121,8 @@ install_agent() {
 configure_systemd() {
   log "4/9" "Configurando servico e console"
 
-    # Monta a particao de dados do pendrive (label LOGITECNO)
-  cat > "$ROOTFS/etc/systemd/system/mnt-dados.mount" <<'EOF'
-[Unit]
-Description=Particao de dados do pendrive LogiTecno
-Before=logitecno.service
-
-[Mount]
-What=/dev/disk/by-label/LOGITECNO
-Where=/mnt/dados
-Type=vfat
-Options=rw,umask=0000,sync
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-  mkdir -p "$ROOTFS/mnt/dados"
-  ln -sf /etc/systemd/system/mnt-dados.mount \
-        "$ROOTFS/etc/systemd/system/multi-user.target.wants/mnt-dados.mount"
-
-  # Servico do agente — roda no tty1, espera rede, desliga ao final
+  # Servico do agente — roda no tty1, espera rede, desliga ao final.
+  # SEM dependencia de particao de dados: o agente usa /tmp e QR Code.
   cat > "$ROOTFS/etc/systemd/system/logitecno.service" <<'EOF'
 [Unit]
 Description=LogiTecno Inventory Collector
@@ -146,7 +130,6 @@ After=network-online.target
 Wants=network-online.target
 Conflicts=getty@tty1.service
 Before=getty@tty1.service
-Requires=mnt-dados.mount
 
 [Service]
 Type=oneshot
@@ -182,7 +165,7 @@ sysfs /sys   sysfs defaults  0 0
 tmpfs /tmp   tmpfs defaults  0 0
 EOF
 
-  ok "systemd configurado"
+  ok "systemd configurado (sem particao de dados)"
 }
 
 # ---------------------------------------------------------------- live boot
@@ -244,7 +227,7 @@ build_grub() {
 
   mkdir -p "$ISO_DIR/boot/grub"
 
-  # Menu do GRUB
+  # Menu do GRUB — sem quiet/splash para o operador ver o que acontece
   cat > "$ISO_DIR/boot/grub/grub.cfg" <<'EOF'
 set timeout=3
 set default=0
@@ -254,7 +237,7 @@ insmod gfxterm
 terminal_output gfxterm
 
 menuentry "LogiTecno Inventory" {
-    linux /casper/vmlinuz boot=casper quiet splash loglevel=3 console=tty1 ---
+    linux /casper/vmlinuz boot=casper console=tty1 loglevel=4 ---
     initrd /casper/initrd
 }
 
@@ -322,11 +305,18 @@ summary() {
   Testar em QEMU (sem pendrive):
     sudo qemu-system-x86_64 -m 2048 -enable-kvm -cdrom "$OUTPUT"
 
-  Gravar no pendrive:
-    sudo dd if="$OUTPUT" of=/dev/sdX bs=4M status=progress oflag=sync
+  Gravar no pendrive (SEM particao de dados):
+    sudo umount /dev/sdX?* 2>/dev/null
+    sudo wipefs -a /dev/sdX
+    sudo dd if="$OUTPUT" of=/dev/sdX bs=4M status=progress oflag=sync conv=fsync
+    sudo partprobe /dev/sdX
+    lsblk /dev/sdX -o NAME,SIZE,FSTYPE,LABEL
 
   ATENCAO: substitua /dev/sdX pelo pendrive correto.
   Use 'lsblk' para identificar. Errar o dispositivo apaga seu disco.
+
+  Sem rede: o agente mostra QR Code + JSON na tela.
+  Com rede: envia para o webhook.
 
 ============================================================
 EOF
@@ -350,4 +340,4 @@ main() {
   summary
 }
 
-main "$@"   
+main "$@"
