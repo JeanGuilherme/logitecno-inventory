@@ -7,17 +7,31 @@ import (
 	"time"
 )
 
-// queuePath é onde a fila local é gravada.
-// No live environment, aponta para a partição gravável do pendrive.
+// queuePath resolve onde a fila sera gravada.
+// Ordem de preferencia:
+//   1. LOGITECNO_QUEUE_PATH (variavel de ambiente)
+//   2. /mnt/dados/queue.jsonl (particao gravavel do pendrive)
+//   3. /tmp/logitecno/queue.jsonl (fallback volatil, ultimo recurso)
 func queuePath() string {
 	if v := os.Getenv("LOGITECNO_QUEUE_PATH"); v != "" {
 		return v
 	}
-	return "/var/lib/logitecno/queue.jsonl"
+
+	// Particao de dados do pendrive
+	dataDir := "/mnt/dados"
+	if st, err := os.Stat(dataDir); err == nil && st.IsDir() {
+		// Testa se e gravavel de verdade
+		testFile := filepath.Join(dataDir, ".write-test")
+		if err := os.WriteFile(testFile, []byte("ok"), 0644); err == nil {
+			os.Remove(testFile)
+			return filepath.Join(dataDir, "queue.jsonl")
+		}
+	}
+
+	// Fallback volatil — avisa que vai perder
+	return "/tmp/logitecno/queue.jsonl"
 }
 
-// queueAppend adiciona o inventário como uma linha JSON (JSONL).
-// Append-only: nunca reescreve o arquivo, então não corrompe em queda de energia.
 func queueAppend(inv Inventory) {
 	path := queuePath()
 
@@ -45,11 +59,8 @@ func queueAppend(inv Inventory) {
 	f.Sync()
 }
 
-// queueCount retorna quantos registros existem na fila.
-// Útil para o resumo na tela do operador.
 func queueCount() int {
-	path := queuePath()
-	b, err := os.ReadFile(path)
+	b, err := os.ReadFile(queuePath())
 	if err != nil {
 		return 0
 	}
@@ -62,8 +73,6 @@ func queueCount() int {
 	return count
 }
 
-// queueFlush tenta enviar tudo da fila. Chamado quando há rede.
-// Retorna quantos foram enviados com sucesso.
 func queueFlush() int {
 	path := queuePath()
 	b, err := os.ReadFile(path)
@@ -91,7 +100,6 @@ func queueFlush() int {
 		}
 	}
 
-	// Reescreve só o que sobrou
 	if len(remaining) == 0 {
 		os.Remove(path)
 	} else {
@@ -116,5 +124,9 @@ func splitLines(b []byte) [][]byte {
 	return out
 }
 
-// touch para evitar import não usado em versões futuras
+// queueIsPersistent informa se a fila esta em local que sobrevive ao reboot.
+func queueIsPersistent() bool {
+	return filepath.Dir(queuePath()) == "/mnt/dados"
+}
+
 var _ = time.Now

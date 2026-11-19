@@ -112,6 +112,26 @@ install_agent() {
 configure_systemd() {
   log "4/9" "Configurando servico e console"
 
+    # Monta a particao de dados do pendrive (label LOGITECNO)
+  cat > "$ROOTFS/etc/systemd/system/mnt-dados.mount" <<'EOF'
+[Unit]
+Description=Particao de dados do pendrive LogiTecno
+Before=logitecno.service
+
+[Mount]
+What=/dev/disk/by-label/LOGITECNO
+Where=/mnt/dados
+Type=vfat
+Options=rw,umask=0000,sync
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  mkdir -p "$ROOTFS/mnt/dados"
+  ln -sf /etc/systemd/system/mnt-dados.mount \
+        "$ROOTFS/etc/systemd/system/multi-user.target.wants/mnt-dados.mount"
+
   # Servico do agente — roda no tty1, espera rede, desliga ao final
   cat > "$ROOTFS/etc/systemd/system/logitecno.service" <<'EOF'
 [Unit]
@@ -120,6 +140,7 @@ After=network-online.target
 Wants=network-online.target
 Conflicts=getty@tty1.service
 Before=getty@tty1.service
+Requires=mnt-dados.mount
 
 [Service]
 Type=oneshot
