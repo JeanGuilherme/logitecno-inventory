@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -67,7 +68,7 @@ func collectInventory() Inventory {
 		for _, line := range strings.Split(string(b), "\n") {
 			if strings.HasPrefix(line, "MemTotal:") {
 				var kb uint64
-				if _, err := fmtSscanf(line, "MemTotal: %d kB", &kb); err == nil {
+				if _, err := fmt.Sscanf(line, "MemTotal: %d kB", &kb); err == nil {
 					inv.RAMBytes = kb * 1024
 				}
 				break
