@@ -10,8 +10,11 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
 DEVICE="${1:-}"
-ISO="${2:-$(dirname "$(dirname "${BASH_SOURCE[0]}")")/iso/logitecno-inventory.iso}"
+ISO="${2:-$PROJECT_ROOT/iso/logitecno-inventory.iso}"
 
 if [[ -z "$DEVICE" ]]; then
   echo "Uso: sudo $0 /dev/sdX [caminho/da/iso]"
