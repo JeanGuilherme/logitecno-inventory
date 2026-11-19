@@ -1,5 +1,20 @@
+# Binários compilados
+agent/collect
+agent/collect.exe
+
+# Artefatos de build
 iso/
+build/work/
+build/iso-rootfs/
 *.iso
 *.img
 *.qcow2
-agent/collect
+
+# Dados de teste
+test/output/
+*.jsonl
+
+# Editores
+.vscode/
+.idea/
+*.swp
