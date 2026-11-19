@@ -82,8 +82,14 @@ build_rootfs() {
   debootstrap \
     --arch=amd64 \
     --variant=minbase \
-    --include=systemd-sysv,udev,iproute2,iputils-ping,ca-certificates,pciutils,util-linux,dmidecode,kbd,console-setup \
+    --include=systemd-sysv,udev,iproute2,iputils-ping,ca-certificates,pciutils,util-linux,dmidecode,kbd,console-setup,linux-image-generic,initramfs-tools \
     "$UBUNTU_SUITE" "$ROOTFS" "$UBUNTU_MIRROR"
+ 
+    # Garante que o initrd existe
+    if ! ls "$ROOTFS"/boot/initrd.img-* >/dev/null 2>&1; then
+        chroot "$ROOTFS" update-initramfs -c -k all || \
+        die "falha ao gerar initrd"
+    fi
 
   ok "rootfs criado: $(du -sh "$ROOTFS" | cut -f1)"
 }
