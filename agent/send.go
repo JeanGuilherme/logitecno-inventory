@@ -11,7 +11,7 @@ import (
 
 // Endpoint configurável por variável de ambiente.
 // Defina LOGITECNO_WEBHOOK_URL no ambiente ou no /etc/environment da ISO.
-const defaultWebhook = ""
+const defaultWebhook = "https://n8n.vps1092.panel.speedfy.host/webhook/logitecno-inventory-mscm"
 
 func webhookURL() string {
 	if v := os.Getenv("LOGITECNO_WEBHOOK_URL"); v != "" {
