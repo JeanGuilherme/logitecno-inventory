@@ -259,14 +259,17 @@ insmod gfxterm
 terminal_output gfxterm
 
 menuentry "LogiTecno Inventory" {
-    linux /casper/vmlinuz boot=casper console=tty1 loglevel=4 ---
+    search --no-floppy --set=root --label LOGITECNO_INV
+    linux /casper/vmlinuz boot=casper console=tty0 loglevel=7 ---
     initrd /casper/initrd
 }
 
 menuentry "LogiTecno Inventory (diagnostico)" {
-    linux /casper/vmlinuz boot=casper console=tty1 loglevel=7 debug ---
+    search --no-floppy --set=root --label LOGITECNO_INV
+    linux /casper/vmlinuz boot=casper console=tty0 loglevel=7 debug ---
     initrd /casper/initrd
 }
+
 EOF
 
   # EFI standalone
