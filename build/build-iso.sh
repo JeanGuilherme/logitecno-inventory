@@ -216,8 +216,12 @@ pack_squashfs() {
     -comp zstd -Xcompression-level 19 -noappend -no-progress
 
   # Tamanho do filesystem (casper usa para barra de progresso)
-  du -sx --block-size=1 "$ROOTFS" | cut -f1 \
-    > "$ISO_DIR/casper/filesystem.size"
+  FS_SIZE=$(du -sx --block-size=1 "$ROOTFS" 2>/dev/null | awk '{print $1}')
+  if [[ -z "$FS_SIZE" || "$FS_SIZE" -lt 1000000 ]]; then
+    die "filesystem.size invalido: '$FS_SIZE' (rootfs vazio ou du falhou)"
+  fi
+  echo "$FS_SIZE" > "$ISO_DIR/casper/filesystem.size"
+  ok "filesystem.size: $FS_SIZE bytes"
 
   ok "squashfs: $(du -sh "$ISO_DIR/casper/filesystem.squashfs" | cut -f1)"
 }
