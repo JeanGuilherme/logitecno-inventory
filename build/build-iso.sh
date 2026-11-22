@@ -251,24 +251,24 @@ build_grub() {
 
   # Menu do GRUB — SEM quiet/splash para o operador ver onde trava
   cat > "$ISO_DIR/boot/grub/grub.cfg" <<'EOF'
-set timeout=5
-set default=0
+  set timeout=5
+  set default=0
 
-insmod all_video
-insmod gfxterm
-terminal_output gfxterm
+  insmod all_video
+  insmod gfxterm
+  terminal_output gfxterm
 
-menuentry "LogiTecno Inventory" {
-    search --no-floppy --set=root --label LOGITECNO_INV
-    linux /casper/vmlinuz boot=casper console=tty0 loglevel=7 ---
-    initrd /casper/initrd
-}
+  menuentry "LogiTecno Inventory" {
+      search --no-floppy --set=root --label LOGITECNO_INV
+      linux /casper/vmlinuz boot=casper console=tty0 loglevel=7 ---
+      initrd /casper/initrd
+  }
 
-menuentry "LogiTecno Inventory (diagnostico)" {
-    search --no-floppy --set=root --label LOGITECNO_INV
-    linux /casper/vmlinuz boot=casper console=tty0 loglevel=7 debug ---
-    initrd /casper/initrd
-}
+  menuentry "LogiTecno Inventory (diagnostico)" {
+      search --no-floppy --set=root --label LOGITECNO_INV
+      linux /casper/vmlinuz boot=casper console=tty0 loglevel=7 debug ---
+      initrd /casper/initrd
+  }
 
 EOF
 
